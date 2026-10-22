@@ -1,7 +1,4 @@
-// main.cpp - Part 3: Menu and Live Window (Sameer Samrat)
-// The same program runs in two modes:
-//   rescue            -> the control-room menu
-//   rescue monitor    -> the live window that shows every update
+
 #include "ers.h"
 
 #include <iostream>
@@ -69,7 +66,6 @@ static void findRoute() {
     showShortestPath(from, to);
 }
 
-// Opens the live window = a second terminal that runs "rescue monitor".
 static void openLiveWindow(const string &exe) {
 #ifdef _WIN32
     string command = "start \"ERS Live Window\" \"" + exe + "\" monitor";
@@ -83,7 +79,7 @@ static void openLiveWindow(const string &exe) {
     cout << "If it did not, open a second terminal in this folder and run:  " << exe << " monitor\n";
 }
 
-// The live window: reads new lines from the feed file and prints them.
+
 static void runMonitor() {
     cout << "=========== EMERGENCY RESCUE SIMULATOR - LIVE WINDOW ===========\n";
     cout << "Every emergency update appears here as it happens.\n";
@@ -97,13 +93,13 @@ static void runMonitor() {
 
         if (in) {
             in.seekg(0, ios::end);
-            if (in.tellg() < position)       // a new simulation emptied the file
+            if (in.tellg() < position)       
                 position = 0;
             in.seekg(position);
 
             string line;
             while (getline(in, line)) {
-                if (in.eof())                // half-written line: read it next time
+                if (in.eof())               
                     break;
                 cout << line << "\n";
                 position += line.size() + 1;
