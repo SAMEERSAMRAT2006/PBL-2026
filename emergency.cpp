@@ -1,7 +1,4 @@
-// emergency.cpp - Part 2: Emergency Queue + Progress Report (Sahil Sinha)
-// Every emergency is stored in the 'history' list (its full record).
-// The priority queue only holds (severity, -id) pairs, so the most severe
-// emergency comes out first and, for equal severity, the oldest one.
+
 #include "ers.h"
 
 #include <iostream>
@@ -11,7 +8,7 @@
 
 using namespace std;
 
-static vector<Emergency> history;                 // history[id - 1] is emergency #id
+static vector<Emergency> history;                
 static priority_queue<pair<int, int> > waitingQueue;
 
 string typeName(EmergencyType type) {
