@@ -3,7 +3,7 @@
 Team "Avengers" | Team ID DSCPP-III-2026-T237 | DS and OOPS with C++ | Mentor: Mr. Upendra Singh Aswal
 
 Terminal-based C++ prototype (Phase-II). The city map is preloaded, and the shortest distances and routes are
-**fixed tables** (no BFS, no Dijkstra in this phase). A city clock runs 60x faster than real time, and every
+**fixed tables**. A city clock runs 60x faster than real time, and every
 update shows up in a **separate live window**.
 
 Full line-by-line explanation: `ERS_Code_Explanation.pdf`
