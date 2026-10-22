@@ -1,7 +1,4 @@
-// dispatch.cpp - Part 3: Teams, Dispatch and the Simulation Clock (Sameer Samrat)
-// A background "engine" thread runs the rescue work while the menu stays usable.
-// Time is simulated: 1 real second = 1 simulated minute, so a rescue that
-// "takes 40 minutes" really takes about 40 seconds on screen.
+
 #include "ers.h"
 
 #include <iostream>
@@ -36,7 +33,7 @@ string clockText(long long t) {
     return twoDigits(mins / 60) + ":" + twoDigits(mins % 60);
 }
 
-// Adds one line to the feed file; the live window prints it.
+
 void liveLog(long long when, const string &message) {
     lock_guard<recursive_mutex> lock(ersLock);
     ofstream out(LIVE_FILE, ios::app | ios::binary);
@@ -63,11 +60,10 @@ static long long travelSeconds(int from, int to) {
 }
 
 static long long workSeconds(const Emergency &e) {
-    return (10 + 4 * e.severity) * 60LL;      // 14 to 30 simulated minutes at the scene
+    return (10 + 4 * e.severity) * 60LL;      
 }
 
-// Function 6: send the nearest free team of the right type.
-// Returns false if every team of that type is busy.
+
 static bool dispatchRescueTeam(int id) {
     Emergency &e = getEmergency(id);
     long long now = simNow();
@@ -107,7 +103,7 @@ static bool dispatchRescueTeam(int id) {
     return true;
 }
 
-// Moves every busy team forward when its next event time has come.
+
 static void moveTeams() {
     long long now = simNow();
 
@@ -121,9 +117,9 @@ static void moveTeams() {
         string id = to_string(e.id);
 
         if (e.status == EN_ROUTE) {
-            t.location = t.nextStop;                       // reached the next stop
+            t.location = t.nextStop;                       
 
-            if (t.location == e.location) {                // reached the emergency
+            if (t.location == e.location) {                
                 e.status = ON_SCENE;
                 e.arrivedAt = when;
                 t.nextAt = when + workSeconds(e);
@@ -137,7 +133,7 @@ static void moveTeams() {
                 liveLog(when, "MOVE " + t.name + " passed " + getLocationName(t.location) +
                         ", heading to " + getLocationName(t.nextStop) + " (Emergency #" + id + ")");
             }
-        } else {                                           // ON_SCENE: work is finished
+        } else {                                           
             e.status = COMPLETED;
             e.finishedAt = when;
             t.available = true;
@@ -149,7 +145,6 @@ static void moveTeams() {
     }
 }
 
-// Serves the queue: most severe first. Emergencies without a free team go back.
 static void assignWaiting() {
     vector<int> notSent;
     int id;
@@ -183,7 +178,7 @@ bool startSimulation() {
 
     loadCityMap();
     initTeams();
-    { ofstream clear(LIVE_FILE, ios::trunc | ios::binary); }   // empty the feed file
+    { ofstream clear(LIVE_FILE, ios::trunc | ios::binary); }  
 
     realStart = chrono::steady_clock::now();
     running = true;
@@ -230,7 +225,7 @@ void showTeams() {
     cout << "=========================================================\n";
 }
 
-// The map picture with teams and open emergencies drawn on it.
+
 void showLiveMap() {
     lock_guard<recursive_mutex> lock(ersLock);
 
