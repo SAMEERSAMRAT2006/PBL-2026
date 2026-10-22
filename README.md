@@ -6,7 +6,7 @@ Terminal-based C++ prototype (Phase-II). The city map is preloaded, and the shor
 **fixed tables**. A city clock runs 60x faster than real time, and every
 update shows up in a **separate live window**.
 
-Full line-by-line explanation: `ERS_Code_Explanation.pdf`
+
 
 ## Files (5 source files)
 
