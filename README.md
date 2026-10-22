@@ -76,30 +76,15 @@ Extra functions: `showReport()` (emergency.cpp), `showTeams()`, `showLiveMap()`,
 
 ## Files
 
-```
-revisedproj/
-  src/
+'''
     ers.h            shared header
     citymap.cpp      Part 1 - Sahil
     emergency.cpp    Part 2 - Paras
     dispatch.cpp     Part 3 - Sameer
     main.cpp         Part 3 - Sameer
-  README.md
-  ERS_Code_Explanation.pdf    line-by-line explanation of every file
-  .gitignore
+  
 ```
 
-## Build and run
-
-Open a terminal **in the `revisedproj` folder** (the folder that contains `src`), then:
-
-```text
-g++ -std=c++11 -Wall -pthread -o rescue.exe src/main.cpp src/citymap.cpp src/emergency.cpp src/dispatch.cpp
-.\rescue.exe
-```
-
-On Linux or macOS: `-o rescue` and `./rescue`.
-Needs a compiler with thread support. On Windows use MinGW-w64 with POSIX threads (MSYS2 or WinLibs).
 
 ## Menu
 
@@ -132,81 +117,7 @@ work at the scene 10 + 4 x severity minutes.
 5. Option 4 - report, option 6 - teams, option 5 - map again with markers
 6. Option 7 - route, for example 0 to 5
 
----
 
-## GitHub guide
 
-### 0. One-time setup (every member)
 
-```
-git --version
-git config --global user.name  "Your Name"
-git config --global user.email "your-github-email@example.com"
-```
-
-### 1. Team lead (Sameer) creates the repo
-
-1. On github.com click **New repository**. Name: `emergency-rescue-simulator`. Choose Private. Do **not** tick "Add a README".
-2. In the project folder run:
-
-```
-git init
-git add README.md .gitignore src/ers.h
-git commit -m "Add README, .gitignore and shared header"
-git branch -M main
-git remote add origin https://github.com/<your-username>/emergency-rescue-simulator.git
-git push -u origin main
-```
-
-3. On GitHub: **Settings > Collaborators > Add people**. Add Paras and Sahil by username.
-
-### 2. Each member pushes their own part on their own branch
-
-Branch names: `part1-citymap` (Sahil), `part2-emergency-queue` (Paras), `part3-dispatch-main` (Sameer).
-Example for Sahil:
-
-```
-git clone https://github.com/<your-username>/emergency-rescue-simulator.git
-cd emergency-rescue-simulator
-git checkout -b part1-citymap
-mkdir -p src
-# copy your file into src/
-git add src/citymap.cpp
-git commit -m "Add city map module (Part 1)"
-git push -u origin part1-citymap
-```
-
-Paras adds `src/emergency.cpp`; Sameer adds `src/dispatch.cpp` and `src/main.cpp`.
-
-### 3. Pull request and merge
-
-1. On GitHub open the repo and click **Compare & pull request** on your branch.
-2. The lead reviews and clicks **Merge pull request**.
-3. After all 3 PRs are merged, everyone runs:
-
-```
-git checkout main
-git pull
-```
-
-Then build with the g++ command above to check the full program.
-
-### 4. Daily workflow
-
-```
-git pull                      # get teammates' latest work first
-# ... edit your own file ...
-git status                    # see what changed
-git add src/yourfile.cpp
-git commit -m "Short message about the change"
-git push
-```
-
-### 5. Common problems
-
-| Problem | Fix |
-|---------|-----|
-| Password rejected on push | GitHub no longer accepts passwords. Use a Personal Access Token (Settings > Developer settings > Tokens), or sign in through VS Code / GitHub Desktop. |
-| `rejected ... non-fast-forward` | `git pull --rebase` then `git push` |
-| Merge conflict | Edit only your own files. If one happens, open the file, keep the right lines, remove the `<<<<`, `====`, `>>>>` markers, then `git add` and `git commit`. |
 | Pushed `rescue.exe` or `ers_live.txt` by mistake | The `.gitignore` blocks both. If already committed: `git rm --cached rescue.exe` and commit. |
