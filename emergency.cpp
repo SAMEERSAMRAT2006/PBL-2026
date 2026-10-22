@@ -27,7 +27,7 @@ string statusName(Status status) {
     }
 }
 
-// Function 3: record a new emergency and put it in the priority queue.
+
 int addEmergency(int location, EmergencyType type, int severity) {
     lock_guard<recursive_mutex> lock(ersLock);
 
@@ -42,7 +42,6 @@ int addEmergency(int location, EmergencyType type, int severity) {
     return id;
 }
 
-// Function 4: take the most urgent emergency out of the queue.
 bool serveNextEmergency(int &id) {
     lock_guard<recursive_mutex> lock(ersLock);
 
@@ -54,7 +53,6 @@ bool serveNextEmergency(int &id) {
     return true;
 }
 
-// used when no team was free: the emergency goes back into the queue
 void putBackEmergency(int id) {
     lock_guard<recursive_mutex> lock(ersLock);
     waitingQueue.push(make_pair(history[id - 1].severity, -id));
@@ -64,8 +62,7 @@ Emergency &getEmergency(int id) {
     return history[id - 1];
 }
 
-// completed = true  -> how many are finished
-// completed = false -> how many are still open
+
 int countEmergencies(bool completed) {
     lock_guard<recursive_mutex> lock(ersLock);
 
@@ -76,7 +73,7 @@ int countEmergencies(bool completed) {
     return count;
 }
 
-// "!1 !3" = emergencies #1 and #3 are still open at this place (used by the map)
+
 string openEmergencyMarks(int location) {
     lock_guard<recursive_mutex> lock(ersLock);
 
@@ -91,7 +88,7 @@ static string minutes(long long seconds) {
     return to_string(seconds / 60) + " min";
 }
 
-// Progress tracker: one block per emergency, plus the average response time.
+
 void showReport() {
     lock_guard<recursive_mutex> lock(ersLock);
 
