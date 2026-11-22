@@ -1,241 +1,132 @@
 
-#include "ers.h"
+#include "dispatch.h"
 
 #include <iostream>
-#include <fstream>
-#include <thread>
-#include <chrono>
-#include <atomic>
-#include <vector>
+#include <iomanip>
+#include <climits>
 
 using namespace std;
 
-recursive_mutex ersLock;
 
-static RescueTeam teams[NUM_TEAMS];
-static atomic<bool> running(false);
-static thread engineThread;
-static chrono::steady_clock::time_point realStart;
+RescueTeam::RescueTeam(const string &n, EmergencyType t, int base)
+    : name(n), type(t), baseLocation(base), location(base),
+      available(true) {}
 
-// ---------------- simulated clock ----------------
+RescueTeam::~RescueTeam() {}
 
-long long simNow() {
-    double realSeconds = chrono::duration<double>(chrono::steady_clock::now() - realStart).count();
-    return SIM_START + static_cast<long long>(realSeconds * TIME_SPEED);
+void RescueTeam::resetToBase() {
+    location = baseLocation;
+    available = true;
 }
 
-static string twoDigits(long long n) {
-    return (n < 10 ? "0" : "") + to_string(n);
+Ambulance::Ambulance(const string &n, int base)
+    : RescueTeam(n, MEDICAL, base) {}
+int Ambulance::serviceMinutes() const { return 10; }
+string Ambulance::vehicle() const { return "Ambulance"; }
+string Ambulance::action() const { return "treating the patients"; }
+
+FireTruck::FireTruck(const string &n, int base)
+    : RescueTeam(n, FIRE, base) {}
+int FireTruck::serviceMinutes() const { return 15; }
+string FireTruck::vehicle() const { return "Fire truck"; }
+string FireTruck::action() const { return "putting out the fire"; }
+
+PoliceCar::PoliceCar(const string &n, int base)
+    : RescueTeam(n, CRIME, base) {}
+int PoliceCar::serviceMinutes() const { return 8; }
+string PoliceCar::vehicle() const { return "Police car"; }
+string PoliceCar::action() const { return "securing the area"; }
+
+
+
+Dispatcher::Dispatcher(const CityMap &cityMap) : map(cityMap) {
+   
+    teams.push_back(new Ambulance("Ambulance-1", 0));
+    teams.push_back(new Ambulance("Ambulance-2", 4));
+    teams.push_back(new Ambulance("Ambulance-3", 5));
+    teams.push_back(new FireTruck("FireTruck-1", 1));
+    teams.push_back(new FireTruck("FireTruck-2", 5));
+    teams.push_back(new FireTruck("FireTruck-3", 3));
+    teams.push_back(new PoliceCar("PoliceCar-1", 2));
+    teams.push_back(new PoliceCar("PoliceCar-2", 3));
+    teams.push_back(new PoliceCar("PoliceCar-3", 4));
 }
 
-string clockText(long long t) {
-    long long mins = (t / 60) % 1440;
-    return twoDigits(mins / 60) + ":" + twoDigits(mins % 60);
+Dispatcher::~Dispatcher() {
+    for (RescueTeam *t : teams)
+        delete t;  
 }
 
-
-void liveLog(long long when, const string &message) {
-    lock_guard<recursive_mutex> lock(ersLock);
-    ofstream out(LIVE_FILE, ios::app | ios::binary);
-    out << "[" << clockText(when) << "] " << message << "\n";
-}
-
-// ---------------- teams ----------------
-
-static void initTeams() {
-    teams[0] = {"Ambulance-1", MEDICAL, 0, true, 0, 0, 0};
-    teams[1] = {"Ambulance-2", MEDICAL, 4, true, 0, 0, 0};
-    teams[2] = {"FireTruck-1", FIRE,    1, true, 0, 0, 0};
-    teams[3] = {"FireTruck-2", FIRE,    5, true, 0, 0, 0};
-    teams[4] = {"PoliceCar-1", CRIME,   2, true, 0, 0, 0};
-    teams[5] = {"PoliceCar-2", CRIME,   3, true, 0, 0, 0};
-}
-
-string teamName(int index) {
-    return (index >= 0 && index < NUM_TEAMS) ? teams[index].name : "Unknown";
-}
-
-static long long travelSeconds(int from, int to) {
-    return getDistance(from, to) * MIN_PER_KM * 60LL;
-}
-
-static long long workSeconds(const Emergency &e) {
-    return (10 + 4 * e.severity) * 60LL;      
-}
-
-
-static bool dispatchRescueTeam(int id) {
-    Emergency &e = getEmergency(id);
-    long long now = simNow();
+int Dispatcher::assign(EmergencyType teamType, int location, Route &route) {
+    lock_guard<mutex> lock(m);
 
     int best = -1;
-    for (int i = 0; i < NUM_TEAMS; i++) {
-        if (teams[i].available && teams[i].type == e.type) {
-            if (best == -1 ||
-                getDistance(teams[i].location, e.location) < getDistance(teams[best].location, e.location))
-                best = i;
-        }
-    }
+    int bestKm = INT_MAX;
+    Route bestRoute;
 
-    if (best == -1) {
-        if (e.status == REPORTED) {
-            e.status = WAITING;
-            liveLog(now, "WAIT Emergency #" + to_string(id) + " is queued: all " +
-                    typeName(e.type) + " teams are busy");
-        }
-        return false;
-    }
-
-    RescueTeam &t = teams[best];
-    string waited = (e.status == WAITING) ? " | waited " + to_string((now - e.reportedAt) / 60) + " min" : "";
-
-    t.available = false;
-    t.job = id;
-    t.nextStop = getNextStop(t.location, e.location);     // first stop on the way
-    t.nextAt = now + travelSeconds(t.location, t.nextStop);
-    e.team = best;
-    e.status = EN_ROUTE;
-    e.startedAt = now;
-
-    liveLog(now, "SEND " + t.name + " -> Emergency #" + to_string(id) + " | route: " +
-            routeText(t.location, e.location) + " | " + to_string(getDistance(t.location, e.location)) +
-            " km | ETA " + clockText(now + travelSeconds(t.location, e.location)) + waited);
-    return true;
-}
-
-
-static void moveTeams() {
-    long long now = simNow();
-
-    for (int i = 0; i < NUM_TEAMS; i++) {
-        RescueTeam &t = teams[i];
-        if (t.available || now < t.nextAt)
+    for (size_t i = 0; i < teams.size(); i++) {
+        if (!teams[i]->isAvailable() || teams[i]->getType() != teamType)
             continue;
 
-        Emergency &e = getEmergency(t.job);
-        long long when = t.nextAt;
-        string id = to_string(e.id);
+        Route r = map.shortestRoute(teams[i]->getLocation(), location);
 
-        if (e.status == EN_ROUTE) {
-            t.location = t.nextStop;                       
-
-            if (t.location == e.location) {                
-                e.status = ON_SCENE;
-                e.arrivedAt = when;
-                t.nextAt = when + workSeconds(e);
-                liveLog(when, "ARRV " + t.name + " reached " + getLocationName(e.location) +
-                        " (Emergency #" + id + ") | response time " +
-                        to_string((when - e.reportedAt) / 60) + " min | working until " +
-                        clockText(t.nextAt));
-            } else {                                       // still on the way
-                t.nextStop = getNextStop(t.location, e.location);
-                t.nextAt = when + travelSeconds(t.location, t.nextStop);
-                liveLog(when, "MOVE " + t.name + " passed " + getLocationName(t.location) +
-                        ", heading to " + getLocationName(t.nextStop) + " (Emergency #" + id + ")");
-            }
-        } else {                                           
-            e.status = COMPLETED;
-            e.finishedAt = when;
-            t.available = true;
-            t.job = 0;
-            liveLog(when, "DONE " + t.name + " finished Emergency #" + id + " | total " +
-                    to_string((when - e.reportedAt) / 60) + " min | team is free at " +
-                    getLocationName(t.location));
+        if (r.km >= 0 && r.km < bestKm) {
+            bestKm = r.km;
+            best = static_cast<int>(i);
+            bestRoute = r;
         }
     }
+
+    if (best == -1)
+        return -1;
+
+    teams[best]->setAvailable(false);
+    route = bestRoute;
+    return best;
 }
 
-static void assignWaiting() {
-    vector<int> notSent;
-    int id;
+void Dispatcher::release(int index, int newLocation) {
+    lock_guard<mutex> lock(m);
 
-    while (serveNextEmergency(id))
-        if (!dispatchRescueTeam(id))
-            notSent.push_back(id);
-
-    for (size_t i = 0; i < notSent.size(); i++)
-        putBackEmergency(notSent[i]);
-}
-
-static void engineLoop() {
-    while (running) {
-        {
-            lock_guard<recursive_mutex> lock(ersLock);
-            moveTeams();
-            assignWaiting();
-        }
-        this_thread::sleep_for(chrono::milliseconds(200));
-    }
-}
-
-// ---------------- start / stop ----------------
-
-bool startSimulation() {
-    if (running) {
-        cout << "\nSimulation is already running.\n";
-        return false;
-    }
-
-    loadCityMap();
-    initTeams();
-    { ofstream clear(LIVE_FILE, ios::trunc | ios::binary); }  
-
-    realStart = chrono::steady_clock::now();
-    running = true;
-    liveLog(SIM_START, "SYSTEM Simulation started - city is active, 6 rescue teams ready");
-    engineThread = thread(engineLoop);
-
-    cout << "\n============================================\n";
-    cout << "       EMERGENCY SIMULATION STARTED\n";
-    cout << "============================================\n";
-    cout << "City clock started at " << clockText(SIM_START) << " (1 real second = 1 minute).\n";
-    cout << "You can now report emergencies.\n";
-    return true;
-}
-
-void stopSimulation() {
-    if (!running)
+    if (index < 0 || index >= static_cast<int>(teams.size()))
         return;
 
-    running = false;
-    if (engineThread.joinable())
-        engineThread.join();
-
-    liveLog(simNow(), "SYSTEM SIMULATION STOPPED");
+    teams[index]->setLocation(newLocation);
+    teams[index]->setAvailable(true);
 }
 
-bool simulationRunning() {
-    return running;
+void Dispatcher::reset() {
+    lock_guard<mutex> lock(m);
+
+    for (RescueTeam *t : teams)
+        t->resetToBase();
 }
 
-// ---------------- screens ----------------
+void Dispatcher::show() const {
+    lock_guard<mutex> lock(m);
 
-void showTeams() {
-    lock_guard<recursive_mutex> lock(ersLock);
+    cout << "\n========== RESCUE TEAMS ==========\n";
 
-    cout << "\n=================== RESCUE TEAMS (time " << clockText(simNow()) << ") ===================\n";
-    for (int i = 0; i < NUM_TEAMS; i++) {
-        const RescueTeam &t = teams[i];
-        cout << t.name << " | " << typeName(t.type) << " | at " << getLocationName(t.location) << " | ";
-        if (t.available)
-            cout << "AVAILABLE\n";
-        else
-            cout << "BUSY - Emergency #" << t.job << " (" << statusName(getEmergency(t.job).status) << ")\n";
+    for (const RescueTeam *t : teams) {
+        cout << left << setw(13) << t->getName()
+             << setw(12) << t->vehicle()
+             << "Base: " << setw(17) << map.name(t->getBase())
+             << "Now at: " << setw(17) << map.name(t->getLocation())
+             << (t->isAvailable() ? "AVAILABLE" : "BUSY") << "\n";
     }
-    cout << "=========================================================\n";
 }
 
+string Dispatcher::teamName(int index) const {
+    lock_guard<mutex> lock(m);
+    return teams.at(index)->getName();
+}
 
-void showLiveMap() {
-    lock_guard<recursive_mutex> lock(ersLock);
+int Dispatcher::serviceMinutes(int index) const {
+    lock_guard<mutex> lock(m);
+    return teams.at(index)->serviceMinutes();   
+}
 
-    string marks[NUM_LOCATIONS];
-    for (int i = 0; i < NUM_TEAMS; i++)
-        marks[teams[i].location] += string(1, teams[i].name[0]) + teams[i].name.back() +
-                                    (teams[i].available ? "" : "*") + " ";
-    for (int i = 0; i < NUM_LOCATIONS; i++)
-        marks[i] += openEmergencyMarks(i);
-
-    cout << "\nCity time: " << clockText(simNow()) << "\n";
-    displayMap(marks);
+string Dispatcher::action(int index) const {
+    lock_guard<mutex> lock(m);
+    return teams.at(index)->action();           
 }
